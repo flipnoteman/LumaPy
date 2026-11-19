@@ -1,0 +1,14 @@
+/target
+.idea
+*.xml
+.claude/
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+.venv/
+.pytest_cache/
+dist/
+.mypy_cache/
+.ruff_cache/
+*.pdb

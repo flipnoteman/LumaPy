@@ -1,0 +1,71 @@
+[build-system]
+requires = ["maturin>=1.9.4,<2"]
+build-backend = "maturin"
+
+[project]
+name = "lumapy"
+description = "Lazy GPU arrays for Python on wgpu (Vulkan, Metal, DX12): fused elementwise kernels, reductions, sorting, group-by, custom WGSL kernels"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+license-files = ["LICENSE-APACHE", "LICENSE-MIT"]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.21"]
+keywords = ["gpu", "wgpu", "vulkan", "metal", "array", "numpy", "scientific-computing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/flipnoteman/LumaPy"
+Repository = "https://github.com/flipnoteman/LumaPy"
+Issues = "https://github.com/flipnoteman/LumaPy/issues"
+Changelog = "https://github.com/flipnoteman/LumaPy/blob/main/CHANGELOG.md"
+Luma = "https://github.com/flipnoteman/Luma"
+
+[dependency-groups]
+test = ["pytest>=7"]
+lint = ["ruff>=0.6", "mypy>=1.10"]
+dev = ["maturin>=1.9.4,<2", { include-group = "test" }, { include-group = "lint" }]
+
+[tool.maturin]
+python-source = "python"
+module-name = "lumapy._lumapy"
+bindings = "pyo3"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "PYI"]
+# NumPy-style module functions deliberately shadow builtins (`sum`, `min`, `abs`, `range`, ...).
+# Stubs keep their docstrings: IDEs show them on hover.
+ignore = ["A001", "A002", "PYI021"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lumapy"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B023"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["python/lumapy"]
+strict = true
