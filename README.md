@@ -140,7 +140,7 @@ You need Python 3.10 or later and a GPU with Vulkan, Metal or DX12 drivers.
 Add LumaPy to a project:
 
 ```sh
-pip install lumapy        # once a release is on PyPI
+pip install pyluma        # once a release is on PyPI; then `import lumapy`
 ```
 
 Or build it from source (needs a Rust toolchain, Luma's `rust-version`, currently 1.99):

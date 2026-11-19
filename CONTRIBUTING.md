@@ -84,4 +84,4 @@ version instead.
    under the new version.
 2. Publish a GitHub release tagged `vX.Y.Z`. `release.yml` checks the tag against `Cargo.toml`, builds the wheels
    and the sdist, and publishes them to PyPI with trusted publishing (configure the `release` environment and the
-   trusted publisher on PyPI once).
+   trusted publisher on PyPI once). The PyPI project is `pyluma`; the import name stays `lumapy`.
