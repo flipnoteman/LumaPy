@@ -16,7 +16,8 @@ All notable changes to LumaPy are listed here. The format follows
   `iterate_until` / `iterate_all` with Python step functions, `Scalar`, `Context` with its options and profiling,
   and custom WGSL `Kernel`s.
 - Type stubs (`_lumapy.pyi`, checked with `stubtest`) and `py.typed`.
-- Wheels for Linux, macOS and Windows (abi3, CPython 3.10+) built and published to PyPI on release.
+- Wheels for Linux (x86_64, aarch64) and Windows (x64) (abi3, CPython 3.10+) built and published to PyPI on
+  release; macOS installs build from the sdist.
 - `lumapy.__luma_version__`, `__luma_commit__` and `__luma_source__` (the Luma the build is compiled against, read
   from `Cargo.lock` at build time) and `lumapy.show_versions()`.
 - Python ports of Luma's `basics`, `conv1d` and `custom_kernel` examples, and `examples/datasci.py`.

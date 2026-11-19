@@ -143,6 +143,9 @@ Add LumaPy to a project:
 pip install pyluma        # once a release is on PyPI; then `import lumapy`
 ```
 
+Prebuilt wheels are published for Linux (x86_64, aarch64) and Windows (x64). On macOS, `pip install pyluma`
+builds from the source distribution, which needs a Rust toolchain.
+
 Or build it from source (needs a Rust toolchain, Luma's `rust-version`, currently 1.99):
 
 ```sh
