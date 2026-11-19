@@ -211,6 +211,62 @@ Luma's other examples (benchmarks, Keccak / SHA-3, ML-KEM) exercise the Rust API
 
 ### Benchmarks
 
+[`benchmarks/gaussian_nb.py`](benchmarks/gaussian_nb.py) compares a Gaussian naive Bayes classifier on the GPU
+with CPU implementations of the same model. Every implementation reproduces scikit-learn's `GaussianNB` (same
+priors, means, variances, smoothing and log-likelihood; `tests/test_gaussian_nb.py` checks them) and predicts the
+same labels as scikit-learn on every test sample. To separate what the GPU contributes from what a better
+algorithm contributes, the CPU side includes the same matrix-product formulation the GPU version uses, in NumPy
+(on multithreaded BLAS), and as fused, parallel loops compiled with Numba; speedups are quoted against the
+fastest CPU implementation.
+
+```sh
+pip install --group bench
+python benchmarks/gaussian_nb.py            # --quick for a smoke run, --threads N, --help for sizes and options
+```
+
+**In short:** the total time to train the classifier and predict with it (lower is better). All four give exactly
+the same predictions.
+
+| Problem size | scikit-learn (the standard tool) | Hand-optimized CPU code (all 24 cores) | LumaPy on the GPU, data copied over first | LumaPy on the GPU, data already there | Fastest |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Small: 10,000 rows × 16 columns | 2.1 ms | **0.28 ms** | 1.0 ms | 0.76 ms | CPU |
+| Medium: 100,000 × 32 | 33 ms | 1.5 ms | 7.0 ms | **0.86 ms** | GPU (data already there) |
+| Large: 1,000,000 × 32 | 387 ms | 25 ms | 13 ms | **3.0 ms** | GPU |
+| Wide: 200,000 × 256 | 411 ms | 17 ms | 18 ms | **3.9 ms** | GPU (data already there) |
+
+Small jobs are faster on the CPU: handing work to the GPU costs more than the whole job. Big jobs are about 8×
+faster on the GPU than well-optimized CPU code, and most so when the data already lives on the GPU. The first run
+of a new problem size also spends up to about 0.3 s preparing GPU code, which is cached for later runs.
+
+The detailed results, fit and predict separately:
+
+On an NVIDIA GeForce RTX 4070 and an AMD Ryzen 9 7900X (12 cores, 24 threads), 10 classes, median of 9 runs
+after a warm-up; the test set is a quarter of the training set. *From NumPy* includes uploading the arrays to
+the GPU; *GPU data* starts from arrays already on it. The fastest CPU implementation was Numba everywhere.
+
+| train samples × features | scikit-learn fit / predict | Numba (24 threads) fit / predict | LumaPy from NumPy fit / predict | LumaPy GPU data fit / predict |
+| --- | ---: | ---: | ---: | ---: |
+| 10,000 × 16 | 1.42 ms / 0.64 ms | 0.25 ms / 0.03 ms | 0.84 ms / 0.17 ms (0.3× / 0.2×) | 0.61 ms / 0.14 ms (0.4× / 0.2×) |
+| 100,000 × 32 | 15.7 ms / 17.2 ms | 1.15 ms / 0.40 ms | 5.99 ms / 0.99 ms (0.2× / 0.4×) | 0.72 ms / 0.15 ms (1.6× / 2.7×) |
+| 1,000,000 × 32 | 194 ms / 193 ms | 20.1 ms / 5.09 ms | 9.91 ms / 3.02 ms (2.0× / 1.7×) | 2.40 ms / 0.57 ms (8.3× / 8.9×) |
+| 200,000 × 256 | 151 ms / 259 ms | 10.5 ms / 6.08 ms | 14.1 ms / 3.94 ms (0.7× / 1.5×) | 3.25 ms / 0.68 ms (3.2× / 9.0×) |
+
+Speedups in parentheses are against Numba. What the numbers say:
+
+* Against scikit-learn as shipped LumaPy is 2–380× faster, but most of that is the algorithm: scikit-learn loops
+  over the classes in Python, in float64, mostly on one core. The same model as parallel CPU loops (Numba) is
+  already 6–44× faster than scikit-learn.
+* Against that CPU baseline the GPU wins when the data is large and already on the GPU (3–9× at a million
+  samples), which is the case in a pipeline that keeps its arrays on the device.
+* When the data starts in NumPy, uploading it dominates: below about a million samples the 24-thread CPU is as
+  fast or faster. Small problems (10,000 samples) are faster on the CPU either way; a GPU launch costs more than
+  the whole computation.
+* The first call of a new shape compiles kernels (30–300 ms here, cached on disk by Luma for later processes),
+  so a single fit on fresh shapes is slower on the GPU; the benchmark reports it separately.
+
+All implementations work in float32 except scikit-learn and the float64 NumPy rows, which the benchmark also
+reports; Numba accumulates its sums in float64.
+
 Luma's Criterion benchmarks of real workloads (Black-Scholes, Mandelbrot, n-body, SGEMM, 2D heat, FIR, k-means, MLP,
 Monte Carlo, imaging) compare CPU and GPU execution in Rust; see
 [Luma's README](https://github.com/flipnoteman/Luma#benchmarks). The bindings add one Python call per recorded

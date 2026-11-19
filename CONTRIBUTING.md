@@ -8,7 +8,8 @@ Cargo.toml, src/          the Rust extension module `lumapy._lumapy`
 pyproject.toml            Python packaging (maturin build backend), ruff, mypy and pytest settings
 python/lumapy/            the Python package: __init__.py (re-exports and NumPy-style functions),
                           _lumapy.pyi (type stubs of the extension), py.typed
-tests/                    pytest suite, checked against NumPy
+tests/                    pytest suite, checked against NumPy (and scikit-learn)
+examples/, benchmarks/    Python ports of Luma's examples; benchmarks against CPU libraries
 .github/workflows/        ci.yml (lint and tests), release.yml (wheels and PyPI publishing)
 ```
 
@@ -35,8 +36,8 @@ CI runs all of these; [pre-commit](https://pre-commit.com) runs the formatters a
 ```sh
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-ruff check python tests examples
-ruff format --check python tests examples
+ruff check python tests examples benchmarks
+ruff format --check python tests examples benchmarks
 mypy                                   # the Python package and the stubs
 python -m mypy.stubtest lumapy._lumapy # the stubs against the built extension
 pytest
