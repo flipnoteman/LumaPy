@@ -41,7 +41,7 @@ jobs:
           args: --release --out dist
           manylinux: auto
           sccache: true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-linux-${{ matrix.target }}
           path: dist
@@ -58,7 +58,7 @@ jobs:
           target: x64
           args: --release --out dist
           sccache: true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-x64
           path: dist
@@ -82,7 +82,7 @@ jobs:
   #         target: ${{ matrix.target }}
   #         args: --release --out dist
   #         sccache: true
-  #     - uses: actions/upload-artifact@v4
+  #     - uses: actions/upload-artifact@v7
   #       with:
   #         name: wheels-macos-${{ matrix.target }}
   #         path: dist
@@ -95,7 +95,7 @@ jobs:
         with:
           command: sdist
           args: --out dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-sdist
           path: dist
