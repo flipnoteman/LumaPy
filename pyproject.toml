@@ -5,13 +5,13 @@ build-backend = "maturin"
 [project]
 # The PyPI name; the package is still imported as `lumapy`.
 name = "pyluma"
-description = "Lazy GPU arrays for Python on wgpu (Vulkan, Metal, DX12): fused elementwise kernels, reductions, sorting, group-by, custom WGSL kernels"
+description = "Lazy GPU arrays for Python on CUDA, Metal and wgpu (Vulkan, DX12), with a native CPU backend: fused elementwise kernels, reductions, sorting, group-by, custom WGSL kernels"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 license-files = ["LICENSE-APACHE", "LICENSE-MIT"]
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.21"]
-keywords = ["gpu", "wgpu", "vulkan", "metal", "array", "numpy", "scientific-computing"]
+keywords = ["gpu", "cuda", "wgpu", "vulkan", "metal", "array", "numpy", "scientific-computing"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",

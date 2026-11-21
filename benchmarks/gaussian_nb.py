@@ -493,6 +493,8 @@ def main() -> None:
             "python": platform.python_version(),
             "lumapy": lp.__version__,
             "luma": lp.__luma_version__,
+            "backend": lp.default_context().backend,
+            "device": lp.default_context().device_name,
             "sklearn": sklearn.__version__,
             "blas": blas,
         }

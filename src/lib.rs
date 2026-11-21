@@ -1,4 +1,4 @@
-//! Python bindings for [Luma](https://github.com/flipnoteman/Luma): lazy GPU arrays on wgpu.
+//! Python bindings for [Luma](https://github.com/flipnoteman/Luma): lazy GPU arrays on CUDA, Metal, wgpu or the CPU.
 //!
 //! The extension module `lumapy._lumapy`; the `lumapy` Python package re-exports it and adds
 //! NumPy-style conveniences. Shapes and axes are NumPy-order on the Python side and reversed

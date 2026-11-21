@@ -60,6 +60,7 @@ _Index: TypeAlias = (
 _ReductionName: TypeAlias = Literal["sum", "min", "max", "sumsq", "sum_of_squares"]
 _PadMode: TypeAlias = Literal["constant", "zero", "edge", "wrap", "symmetric", "mirror"]
 _DeviceName: TypeAlias = Literal["auto", "gpu", "cpu"]
+_BackendName: TypeAlias = Literal["auto", "cuda", "metal", "wgpu", "cpu"]
 
 _R = TypeVar("_R")
 
@@ -293,12 +294,13 @@ class Array:
 
 @final
 class Context:
-    """A GPU (or software Vulkan) device with its own batch of recorded operations."""
+    """A device (a GPU, or the host CPU) with its own batch of recorded operations."""
 
     def __new__(
         cls,
         device: _DeviceName | None = None,
         *,
+        backend: _BackendName | None = None,
         memory_budget: int | None = None,
         chunk_bytes: int | None = None,
         calibrate: bool | None = None,
@@ -310,6 +312,10 @@ class Context:
     def cpu() -> Context: ...
     @property
     def is_cpu(self) -> bool: ...
+    @property
+    def backend(self) -> str: ...
+    @property
+    def device_name(self) -> str: ...
     @property
     def tuning_profile(self) -> str: ...
     @property

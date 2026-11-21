@@ -24,3 +24,11 @@ All notable changes to LumaPy are listed here. The format follows
 - `benchmarks/gaussian_nb.py`: Gaussian naive Bayes with LumaPy against scikit-learn's `GaussianNB` and against
   CPU implementations of the same formulation (NumPy on multithreaded BLAS, fused parallel Numba loops), with
   first-call and spread reporting; a test checks that every implementation fits scikit-learn's model.
+- `lp.Context(backend=...)` (`"auto"`, `"cuda"`, `"metal"`, `"wgpu"`, `"cpu"`), `Context.backend` and
+  `Context.device_name`; `show_versions()` and the benchmark's JSON name the backend and device.
+
+### Changed
+
+- Built on Luma 0.5.1 from crates.io (was a git commit of Luma 0.4.1+). NVIDIA GPUs now run on Luma's native CUDA
+  backend and Apple GPUs on its native Metal backend by default; without a GPU, Luma's native CPU backend replaces
+  Mesa llvmpipe, so no software Vulkan driver is needed (CI no longer installs one).

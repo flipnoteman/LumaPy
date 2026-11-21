@@ -1,17 +1,19 @@
 //! `lumapy.Context` (a device and its batch of recorded work) and GPU profiles.
 
-use luma::{Context, ContextOptions, DeviceKind, Profile, TuningProfile};
+use luma::{BackendKind, Context, ContextOptions, DeviceKind, Profile, TuningProfile};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use crate::error::IntoPy;
 
-/// A GPU (or software Vulkan) device with its own batch of recorded operations.
+/// A device (a GPU, or the host CPU) with its own batch of recorded operations.
 ///
 /// Arrays created without `ctx=` live on the default context (`lumapy.default_context()`),
 /// opened on first use. Options left as `None` come from the `LUMA_*` environment variables.
 ///
-/// * `device`: `"auto"` (a GPU, else the CPU fallback), `"gpu"` or `"cpu"`.
+/// * `device`: `"auto"` (a GPU, else the CPU backend), `"gpu"` or `"cpu"`.
+/// * `backend`: `"auto"` (CUDA, then Metal, then wgpu, then the CPU), `"cuda"`, `"metal"`, `"wgpu"`
+///   or `"cpu"`.
 /// * `memory_budget`: bytes of array data kept on the device before spilling to host memory.
 /// * `chunk_bytes`: the largest buffer an array is split into (a power of two).
 /// * `calibrate`: measure the device's throughputs when it opens (cached per machine).
@@ -33,14 +35,28 @@ fn device_kind(name: &str) -> PyResult<DeviceKind> {
     }
 }
 
+fn backend_kind(name: &str) -> PyResult<BackendKind> {
+    match name.to_ascii_lowercase().as_str() {
+        "auto" => Ok(BackendKind::Auto),
+        "cuda" => Ok(BackendKind::Cuda),
+        "metal" => Ok(BackendKind::Metal),
+        "wgpu" => Ok(BackendKind::Wgpu),
+        "cpu" => Ok(BackendKind::Cpu),
+        other => Err(PyValueError::new_err(format!(
+            "backend is \"auto\", \"cuda\", \"metal\", \"wgpu\" or \"cpu\", not {other:?}"
+        ))),
+    }
+}
+
 #[pymethods]
 impl PyContext {
     #[new]
-    #[pyo3(signature = (device = None, *, memory_budget = None, chunk_bytes = None, calibrate = None, check_finite = None, fast_math = None, df_fma = None))]
+    #[pyo3(signature = (device = None, *, backend = None, memory_budget = None, chunk_bytes = None, calibrate = None, check_finite = None, fast_math = None, df_fma = None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         py: Python<'_>,
         device: Option<&str>,
+        backend: Option<&str>,
         memory_budget: Option<u64>,
         chunk_bytes: Option<u64>,
         calibrate: Option<bool>,
@@ -51,6 +67,9 @@ impl PyContext {
         let mut options = ContextOptions::from_env();
         if let Some(d) = device {
             options = options.device(device_kind(d)?);
+        }
+        if let Some(b) = backend {
+            options = options.backend(backend_kind(b)?);
         }
         if let Some(b) = memory_budget {
             options = options.memory_budget(b);
@@ -74,16 +93,28 @@ impl PyContext {
         Ok(PyContext { inner })
     }
 
-    /// A software (CPU) device, for example Mesa llvmpipe, whatever GPUs exist.
+    /// The native CPU backend, whatever GPUs exist.
     #[staticmethod]
     fn cpu(py: Python<'_>) -> PyResult<PyContext> {
         Ok(PyContext { inner: py.detach(Context::cpu).py()? })
     }
 
-    /// Whether this is a software (CPU) device.
+    /// Whether this context runs on the CPU backend.
     #[getter]
     fn is_cpu(&self) -> bool {
         self.inner.is_cpu()
+    }
+
+    /// The backend this context runs on: `"cuda"`, `"metal"`, `"wgpu"` or `"cpu"`.
+    #[getter]
+    fn backend(&self) -> String {
+        self.inner.backend().to_string()
+    }
+
+    /// The device's name (the GPU's name, or a description of the CPU).
+    #[getter]
+    fn device_name(&self) -> &str {
+        self.inner.device_name()
     }
 
     /// Submits the recorded work and waits until the GPU has finished it.
@@ -108,7 +139,7 @@ impl PyContext {
         }
     }
 
-    /// The wgpu features the device was opened with, by name (`"SHADER_F64"`, ...).
+    /// The device features the context was opened with, by name (`"SHADER_F64"`, ...).
     #[getter]
     fn features(&self) -> Vec<String> {
         self.inner.features().iter_names().map(|(name, _)| name.to_owned()).collect()
@@ -157,7 +188,12 @@ impl PyContext {
     }
 
     fn __repr__(&self) -> String {
-        format!("lumapy.Context(tuning_profile={:?}, is_cpu={})", self.tuning_profile(), self.inner.is_cpu())
+        format!(
+            "lumapy.Context(backend={:?}, device_name={:?}, tuning_profile={:?})",
+            self.backend(),
+            self.device_name(),
+            self.tuning_profile()
+        )
     }
 }
 

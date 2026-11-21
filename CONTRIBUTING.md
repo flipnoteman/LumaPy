@@ -43,30 +43,29 @@ python -m mypy.stubtest lumapy._lumapy # the stubs against the built extension
 pytest
 ```
 
-`LUMA_DEVICE=cpu pytest` runs the tests on a software Vulkan driver, as CI does on Linux.
+`LUMA_DEVICE=cpu pytest` runs the tests on Luma's native CPU backend, as CI does on Linux; `LUMA_BACKEND=wgpu`
+(or `cuda`, `metal`) runs them on one GPU backend.
 
 ## Developing against a local Luma
 
-`Cargo.toml` pins Luma to a commit on GitHub, so builds are reproducible anywhere. To build against a Luma checkout
-next to this repository instead (`../Luma`), override the dependency without editing `Cargo.toml`, for example in a
-`.cargo/config.toml` in the directory that holds both repositories (Cargo reads config files from parent
-directories):
+`Cargo.toml` depends on Luma from crates.io. To build against a Luma checkout next to this repository instead
+(`../Luma`), override the dependency without editing `Cargo.toml`, for example in a `.cargo/config.toml` in the
+directory that holds both repositories (Cargo reads config files from parent directories):
 
 ```toml
-[patch."https://github.com/flipnoteman/Luma"]
+[patch.crates-io]
 luma = { path = "Luma" }
 ```
 
 or for a single build:
 
 ```sh
-cargo build --config 'patch."https://github.com/flipnoteman/Luma".luma.path="../Luma"'
+cargo build --config 'patch.crates-io.luma.path="../Luma"'
 ```
 
-When a change needs a new Luma commit, push it to Luma and update the `rev` in `Cargo.toml` (and `Cargo.lock` with
+When the bindings need a new Luma release, update the version in `Cargo.toml` (and `Cargo.lock` with
 `cargo update -p luma`). Then update the "Mirrors Luma" line at the top of the README and its feature parity
-table; `tests/test_docs.py` fails while the README names another version or commit than the build. Once Luma publishes a release with everything the bindings use, depend on the crates.io
-version instead.
+table; `tests/test_docs.py` fails while the README names another version than the build.
 
 ## Adding a binding
 

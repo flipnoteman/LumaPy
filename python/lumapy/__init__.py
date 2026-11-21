@@ -228,8 +228,7 @@ def show_versions() -> None:
     ]
     try:
         ctx = default_context()
-        kind = "cpu (software)" if ctx.is_cpu else "gpu"
-        lines.append(f"device  {kind}, tuning profile {ctx.tuning_profile}")
+        lines.append(f"device  {ctx.device_name} ({ctx.backend} backend), tuning profile {ctx.tuning_profile}")
     except LumaError as e:
         lines.append(f"device  none ({e})")
     print("\n".join(lines))

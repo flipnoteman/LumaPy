@@ -1,13 +1,11 @@
 # LumaPy
 
 Python bindings for [Luma](https://github.com/flipnoteman/Luma), the async GPU compute library for Rust. Write code
-with ordinary arithmetic operations and methods, and Luma handles execution with whatever hardware you have (Vulkan,
-Metal or DX12, through [wgpu](https://wgpu.rs)).
+with ordinary arithmetic operations and methods, and Luma handles execution with whatever hardware you have (CUDA,
+Metal, or Vulkan/Metal/DX12 through [wgpu](https://wgpu.rs), with a native CPU backend when there is no GPU).
 
-> **Mirrors Luma 0.4.1** plus the unreleased changes up to
-> [`5a592c4`](https://github.com/flipnoteman/Luma/commit/5a592c4c53137ff93e4d0437818d47a24c1f3fbc) (Luma `main`).
-> A build reports the Luma it was compiled against: `lumapy.__luma_version__`, `lumapy.__luma_commit__`, or
-> `lumapy.show_versions()`.
+> **Mirrors Luma 0.5.1** ([crates.io](https://crates.io/crates/luma/0.5.1)). A build reports the Luma it was
+> compiled against: `lumapy.__luma_version__`, `lumapy.__luma_source__`, or `lumapy.show_versions()`.
 
 ```python
 import lumapy as lp
@@ -67,7 +65,8 @@ print(gram.shape, variance.size)               # (3, 3) 3
 | Subgroups, `f16`, cooperative matrices, per-vendor kernel tuning | ✅ (automatic inside Luma) |
 | Errors as values (poisoned arrays) | ✅ raised as `lumapy.LumaError` where a result is needed |
 | Per-kernel GPU timing (`Context::profile`) | ✅ `ctx.profile(fn)` |
-| `Context`, `ContextOptions`, CPU fallback, arrays larger than a buffer or device memory | ✅ `lp.Context(device=, memory_budget=, ...)`; `Context::cost_model` ❌ |
+| `Context`, `ContextOptions` (`backend`, `device`, ...), `Context::{backend, device_name}`, CPU backend, arrays larger than a buffer or device memory | ✅ `lp.Context(device=, backend=, memory_budget=, ...)`, `ctx.backend`, `ctx.device_name`; `Context::cost_model` ❌ |
+| `Context::memory_stats`, `Context::trim` | ❌ |
 
 Similar to [ArrayFire](https://arrayfire.com), code is written with the familiarity of the `Array` interface. Execution
 of operations is deferred until the host requires the result. Chains of elementwise operations are fused into a single
@@ -112,7 +111,8 @@ and stubs), so editors show every signature.
 - Kernel tuning per GPU vendor (Apple and NVIDIA measured, generic defaults elsewhere)
 - Useful error handling: failed operations raise `lumapy.LumaError` with the operation and its cause
 - Per-kernel GPU timing with `ctx.profile(..)`
-- CPU fallback through Mesa llvmpipe when no GPU is present
+- Native CUDA and Metal backends next to wgpu, chosen automatically (`lp.Context(backend=...)` or `LUMA_BACKEND` to
+  pick one), and a native CPU backend (Cranelift SIMD on all cores) when no GPU is present
 - Arrays larger than one device buffer or than device memory
 
 ### Conventions
@@ -135,7 +135,8 @@ and stubs), so editors show every signature.
 
 ## Getting started
 
-You need Python 3.10 or later and a GPU with Vulkan, Metal or DX12 drivers.
+You need Python 3.10 or later. A GPU is optional: Luma uses an NVIDIA GPU through its driver (no CUDA toolkit
+needed), Apple GPUs through Metal, other GPUs through Vulkan or DX12, and the CPU otherwise.
 
 Add LumaPy to a project:
 
@@ -158,28 +159,31 @@ pytest
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup.
 
-### No GPU
+### Backends and no GPU
 
-Without a GPU, Luma runs through Mesa's llvmpipe, a software Vulkan driver. It is not built into Luma: the driver has
-to be installed on the machine (`mesa-vulkan-drivers` on most Linux distributions), otherwise opening a context raises
-`lumapy.LumaError`. It is picked automatically when no GPU opens. `LUMA_DEVICE=cpu`, `lp.Context("cpu")` or
-`lp.Context.cpu()` force it, and `LUMA_DEVICE=gpu` (or `lp.Context("gpu")`) refuses the fallback and raises instead.
+`backend="auto"` (the default) opens the first of CUDA, Metal and wgpu that has a GPU, and otherwise Luma's native
+CPU backend, which is built into every wheel (no system driver needed). `lp.Context(backend="wgpu")` or
+`LUMA_BACKEND=wgpu` picks one; `ctx.backend` and `ctx.device_name` say which device runs. `LUMA_DEVICE=cpu`,
+`lp.Context("cpu")` or `lp.Context.cpu()` force the CPU backend, and `LUMA_DEVICE=gpu` (or `lp.Context("gpu")`)
+refuses it and raises instead. Software Vulkan drivers (llvmpipe, SwiftShader, WARP) are never used.
 
 ### Large arrays
 
 An array bigger than one device buffer is split over several buffers automatically, and the built-in operations run
-over them in pieces. Array data beyond the device memory budget (80% of device memory on Vulkan GPUs) moves to host
+over them in pieces. Array data beyond the device memory budget (80% of device memory on GPUs) moves to host
 memory and back on demand, with a one-time warning (`ctx.spilled_bytes` reports how much). Custom kernels need arrays
 that fit one buffer.
 
 ### Environment variables
 
-Luma's environment variables apply unchanged. Options passed to `lp.Context(...)` (`device`, `memory_budget`,
-`chunk_bytes`, `calibrate`, `check_finite`, `fast_math`, `df_fma`) override them for that context.
+Luma's environment variables apply unchanged. Options passed to `lp.Context(...)` (`device`, `backend`,
+`memory_budget`, `chunk_bytes`, `calibrate`, `check_finite`, `fast_math`, `df_fma`) override them for that context.
 
 | Variable | Effect |
 | --- | --- |
+| `LUMA_BACKEND` | `cuda`, `metal`, `wgpu`, `cpu` or `auto`: the backend to open (default `auto`: CUDA, then Metal, then wgpu, then the CPU) |
 | `LUMA_DEVICE` | `gpu` or `cpu`: restrict the device kind (default: GPU, CPU as fallback) |
+| `LUMA_CPU_THREADS` | Threads of the CPU backend (default: the available parallelism) |
 | `LUMA_MEMORY_BUDGET` | Bytes of array data kept on the device before spilling to host memory (idle buffers kept for reuse take up to half of it) |
 | `LUMA_CHUNK_BYTES` | Largest buffer an array is split into, in bytes (power of two) |
 | `LUMA_TUNING` | `apple`, `nvidia`, `generic` or `cpu`: override the kernel tuning profile |
@@ -232,40 +236,41 @@ the same predictions.
 
 | Problem size | scikit-learn (the standard tool) | Hand-optimized CPU code (all 24 cores) | LumaPy on the GPU, data copied over first | LumaPy on the GPU, data already there | Fastest |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Small: 10,000 rows × 16 columns | 2.1 ms | **0.28 ms** | 1.0 ms | 0.76 ms | CPU |
-| Medium: 100,000 × 32 | 33 ms | 1.5 ms | 7.0 ms | **0.86 ms** | GPU (data already there) |
-| Large: 1,000,000 × 32 | 387 ms | 25 ms | 13 ms | **3.0 ms** | GPU |
-| Wide: 200,000 × 256 | 411 ms | 17 ms | 18 ms | **3.9 ms** | GPU (data already there) |
+| Small: 10,000 rows × 16 columns | 2.1 ms | **0.29 ms** | 0.47 ms | 0.37 ms | CPU |
+| Medium: 100,000 × 32 | 37 ms | 1.7 ms | 2.3 ms | **0.49 ms** | GPU (data already there) |
+| Large: 1,000,000 × 32 | 417 ms | 24 ms | 13 ms | **2.2 ms** | GPU |
+| Wide: 200,000 × 256 | 423 ms | 17 ms | 21 ms | **3.0 ms** | GPU (data already there) |
 
-Small jobs are faster on the CPU: handing work to the GPU costs more than the whole job. Big jobs are about 8×
-faster on the GPU than well-optimized CPU code, and most so when the data already lives on the GPU. The first run
-of a new problem size also spends up to about 0.3 s preparing GPU code, which is cached for later runs.
+Small jobs are faster on the CPU: handing work to the GPU costs more than the whole job. Big jobs are 6–11× faster
+on the GPU than well-optimized CPU code, and most so when the data already lives on the GPU. The first run of a new
+problem size also spends up to about 0.4 s preparing GPU code (about 0.1 s once Luma's disk cache has it).
 
 The detailed results, fit and predict separately:
 
-On an NVIDIA GeForce RTX 4070 and an AMD Ryzen 9 7900X (12 cores, 24 threads), 10 classes, median of 9 runs
-after a warm-up; the test set is a quarter of the training set. *From NumPy* includes uploading the arrays to
-the GPU; *GPU data* starts from arrays already on it. The fastest CPU implementation was Numba everywhere.
+On an NVIDIA GeForce RTX 4070 (Luma 0.5.1, CUDA backend) and an AMD Ryzen 9 7900X (12 cores, 24 threads), 10
+classes, median of 9 runs after a warm-up; the test set is a quarter of the training set. *From NumPy* includes
+uploading the arrays to the GPU; *GPU data* starts from arrays already on it. The fastest CPU implementation was
+Numba everywhere.
 
 | train samples × features | scikit-learn fit / predict | Numba (24 threads) fit / predict | LumaPy from NumPy fit / predict | LumaPy GPU data fit / predict |
 | --- | ---: | ---: | ---: | ---: |
-| 10,000 × 16 | 1.42 ms / 0.64 ms | 0.25 ms / 0.03 ms | 0.84 ms / 0.17 ms (0.3× / 0.2×) | 0.61 ms / 0.14 ms (0.4× / 0.2×) |
-| 100,000 × 32 | 15.7 ms / 17.2 ms | 1.15 ms / 0.40 ms | 5.99 ms / 0.99 ms (0.2× / 0.4×) | 0.72 ms / 0.15 ms (1.6× / 2.7×) |
-| 1,000,000 × 32 | 194 ms / 193 ms | 20.1 ms / 5.09 ms | 9.91 ms / 3.02 ms (2.0× / 1.7×) | 2.40 ms / 0.57 ms (8.3× / 8.9×) |
-| 200,000 × 256 | 151 ms / 259 ms | 10.5 ms / 6.08 ms | 14.1 ms / 3.94 ms (0.7× / 1.5×) | 3.25 ms / 0.68 ms (3.2× / 9.0×) |
+| 10,000 × 16 | 1.43 ms / 0.70 ms | 0.25 ms / 0.04 ms | 0.40 ms / 0.07 ms (0.6× / 0.5×) | 0.31 ms / 0.06 ms (0.8× / 0.6×) |
+| 100,000 × 32 | 18.8 ms / 17.8 ms | 1.08 ms / 0.58 ms | 2.00 ms / 0.32 ms (0.5× / 1.8×) | 0.44 ms / 0.05 ms (2.4× / 11.7×) |
+| 1,000,000 × 32 | 216 ms / 201 ms | 19.4 ms / 4.23 ms | 9.82 ms / 2.99 ms (2.0× / 1.4×) | 1.85 ms / 0.33 ms (10.5× / 12.9×) |
+| 200,000 × 256 | 156 ms / 267 ms | 10.5 ms / 6.27 ms | 17.2 ms / 4.26 ms (0.6× / 1.5×) | 2.55 ms / 0.43 ms (4.1× / 14.6×) |
 
 Speedups in parentheses are against Numba. What the numbers say:
 
-* Against scikit-learn as shipped LumaPy is 2–380× faster, but most of that is the algorithm: scikit-learn loops
+* Against scikit-learn as shipped LumaPy is 5–620× faster, but most of that is the algorithm: scikit-learn loops
   over the classes in Python, in float64, mostly on one core. The same model as parallel CPU loops (Numba) is
-  already 6–44× faster than scikit-learn.
-* Against that CPU baseline the GPU wins when the data is large and already on the GPU (3–9× at a million
-  samples), which is the case in a pipeline that keeps its arrays on the device.
+  already 6–48× faster than scikit-learn.
+* Against that CPU baseline the GPU wins when the data is already on the GPU (2–15× from 100,000 samples on),
+  which is the case in a pipeline that keeps its arrays on the device.
 * When the data starts in NumPy, uploading it dominates: below about a million samples the 24-thread CPU is as
   fast or faster. Small problems (10,000 samples) are faster on the CPU either way; a GPU launch costs more than
   the whole computation.
-* The first call of a new shape compiles kernels (30–300 ms here, cached on disk by Luma for later processes),
-  so a single fit on fresh shapes is slower on the GPU; the benchmark reports it separately.
+* The first call of a new shape compiles kernels (up to 0.4 s here, about 0.1 s from Luma's disk cache in later
+  processes), so a single fit on fresh shapes is slower on the GPU; the benchmark reports it separately.
 
 All implementations work in float32 except scikit-learn and the float64 NumPy rows, which the benchmark also
 reports; Numba accumulates its sums in float64.
